@@ -1,0 +1,562 @@
+openapi: 3.0.2
+info:
+  title: FastAPI Application
+  version: '1.0.0'
+  description: API for LLMQueryExecutor and LLMVisualisationManager functionality, with user management.
+servers:
+  - url: https://www.budgety.ai
+  - url: http://34.118.104.85:3000
+
+
+paths:
+  /api/info/models:
+    get:
+      tags:
+        - info
+      summary: Retrieve model data from the YAML file.
+      responses:
+        '200':
+          description: Successful response with model data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      type: string
+                    description: List of available model names.
+                  defaults:
+                    type: object
+                    additionalProperties:
+                      type: string
+                    description: Default models for each functionality.
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+
+  /api/visualize:
+    post:
+      tags:
+        - task
+      summary: Generate visualizations based on provided data.
+      requestBody:
+        description: Data and query for visualization.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisualizeRequest'
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Visualization result
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+
+  /api/execute:
+    post:
+      tags:
+        - task
+      summary: Executes LLM query and returns results, SQL query, and error (if any).
+      requestBody:
+        description: Execution input parameters.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExecuteRequest'
+
+            example:
+              input_text: "En cok para harcadigimiz 3 tedarikci kim?"
+              name_of_model: "gpt-4o-2024-08-06"
+              repeat_if_fails: 0
+              free_chat: true
+              use_chat_context_for_sql: false
+              use_chat_context_for_summary: false
+              include_sql_in_chat_context: false
+              include_data_in_chat_context: false
+              history_range_for_context: 0
+              how_many_rows_of_data_should_be_saved_to_message_objects: 0
+              do_not_save_to_chat_history: false
+              return_mock_data: false
+              enable_rag_optimization: false
+              passcode: "string"
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Execution result with LLM answer, SQL, and error if any.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+
+                  llm_request_success:
+                    type: boolean
+
+                  answer:
+                    #  make sure pydantic is like this Optional[List[Dict[str, Any]]] = None
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DictStrAny'
+
+                    nullable: true
+                  sql:
+                    type: string
+                  error:
+                    type: string
+                  message_id:
+                    type: integer
+                  message_type:
+                    type: string
+                  model_rejection_popup_message:
+                     type: string
+                  usage:
+                    type: object
+                    properties:
+                      input_tokens:
+                        type: integer
+                        description: Number of input tokens used.
+                      output_tokens:
+                        type: integer
+                        description: Number of output tokens generated.
+                      model:
+                        type: string
+                        description: The model used for the LLM query.
+                      total_tokens:
+                        type: integer
+                        description: Total number of tokens used.
+                      total_cost:
+                        type: number
+                        format: float
+                        description: Total cost for the query execution.
+
+
+#        '401':
+#          description: Unauthorized - Invalid passcode.
+#        '500':
+#          description: Internal Server Error
+#          content:
+#            application/json:
+#              schema:
+#                type: object
+#                properties:
+#                  detail:
+#                    type: string
+
+  /api/chat/meta:
+    get:
+      tags:
+        - chat
+      summary: Retrieve the list of historical messages.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved history messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMetaData'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+  /api/chat/history:
+    get:
+      tags:
+        - chat
+      summary: Retrieve the list of historical messages.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved history messages.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistoryMessage'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+    post:
+      tags:
+        - chat
+      summary: Add a new message to the history.
+      requestBody:
+        description: Historical message to store.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoryMessage'
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully added the message to history.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+
+  /api/usage:
+    get:
+      tags:
+        - info
+      summary: Get total cost, query creation cost, and visualization cost.
+
+      # security:
+      #   - bearerAuth: []
+      responses:
+        '200':
+          description: Total cost, query creation cost, and visualization cost.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query_creation_cost:
+                    type: number
+                  visualization_cost:
+                    type: number
+                  total_cost:
+                    type: number
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+
+
+
+  /api/user/{user_id}:
+    get:
+      tags:
+        - user
+      summary: Get user data by user_id.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user to retrieve.
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved user data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserData'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+    put:
+      tags:
+        - user
+      summary: Update user data by user_id.
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID of the user to update.
+          schema:
+            type: string
+      requestBody:
+        description: User data to update.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserData'
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully updated user data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserData'
+        '404':
+          description: User not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+  /api/user:
+    post:
+      tags:
+        - user
+      summary: Create a new user.
+      requestBody:
+        description: Data for the new user.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserData'
+
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserData'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+
+
+#  input_message_config={"free_chat":True,
+#  "use_context_for_sql": True,
+#  "use_context_for_summary": True,
+#  "repeat_if_fails": 5,
+#  # "model" : "gpt-4o-mini"
+#  "model": "gpt-4o",
+#  "timestamp": datetime.now().isoformat()
+#}
+#
+
+components:
+  schemas:
+
+    DictStrAny:
+      type: object
+      additionalProperties: true
+
+#    AnyValue:
+#      description: A value that can be of any JSON-compatible type
+#      oneOf:
+#        - type: string
+#        - type: number
+#        - type: integer
+#        - type: boolean
+#        - type: object
+#        - type: array
+#        - type: null
+
+    ExecuteRequest:
+      type: object
+      properties:
+        input_text:
+          type: string
+        name_of_model:
+          type: string
+        pick_model_for_visualisation:
+          type: string
+        pick_model_for_summary:
+          type: string
+        pick_model_for_ai_chat:
+          type: string
+        pick_model_for_message_type_checker:
+          type: string
+        repeat_if_fails:
+          type: integer
+        free_chat:
+          type: boolean
+        use_chat_context_for_sql:
+          type: boolean
+        use_chat_context_for_summary:
+          type: boolean
+        include_sql_in_chat_context:
+           type: boolean
+        include_data_in_chat_context:
+          type: boolean
+        history_range_for_context:
+          type: integer
+        how_many_rows_of_data_should_be_saved_to_message_objects:
+          type: integer
+        do_not_save_to_chat_history:
+          type: boolean
+        return_mock_data:
+           type: boolean
+        enable_rag_optimization:
+           type: boolean
+        passcode:
+          type: string
+
+
+
+#        passcode:
+#          type: string
+
+    VisualizeRequest:
+      type: object
+      properties:
+        data:
+          type: string
+        query:
+          type: string
+        background:
+          type: string
+        visualization_guide:
+          type: string
+        message_id:
+           type: integer
+
+    ChatMetaData:
+      type: object
+      properties:
+        chat_name:
+          type: string
+        creation:
+          type: string
+        attached_db_name:
+          type: string
+
+
+
+    HistoryMessage:
+      type: object
+      properties:
+        user_id:
+          type: integer
+        user_name:
+          type: string
+        user_type:
+           type: string
+        id:
+          type: integer
+        message:
+          type: string
+        message_type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        sql:
+          type: string
+        sql_result:
+          type: string
+        visual_code:
+          type: string
+        visual_code_mini:
+          type: string
+
+
+    UsageCost:
+      type: object
+      properties:
+        query_creation_cost:
+          type: number
+        visualization_cost:
+          type: number
+    UserData:
+      type: object
+      properties:
+        user_id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        preferences:
+          type: object
+          properties:
+            language:
+              type: string
+            theme:
+              type: string
+        IAM:
+          type: object
+          properties:
+            allowed_models:
+              type: array
+              items:
+                type: string
+            allowed_actions:
+              type: array
+              items:
+                type: string
+            credit_limit:
+              type: number
+
+  securitySchemes:
+      bearerAuth:
+        type: http
+        scheme: bearer
+        bearerFormat: JWT
+
+
