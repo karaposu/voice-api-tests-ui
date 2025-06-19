@@ -1,13 +1,19 @@
 import { ChatHistory } from "../ChatHistory";
 import { useSettingsModalStore } from "@/hooks/SettingsModalStore";
 import ChatTabs from "../ChatTabs";
+import { ApiUsage } from "../ApiUsage";
 
 export const Leftside = () => {
   const { usage, showPerMessageCost } = useSettingsModalStore();
+  const { showTotalCost } = useSettingsModalStore();
 
   return (
     <>
-      <div className="text-xl font-bold mb-4">Voice API Tester</div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-xl font-bold">Voice API Tester</div>
+        {showTotalCost && <ApiUsage />}
+        <span className="md:inline-block hidden w-44"></span>
+      </div>
 
       <ChatHistory />
 
