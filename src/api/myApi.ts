@@ -62,6 +62,7 @@ export interface HistoryMessage {
 }
 
 export interface UsageCost {
+  total_cost?: number;
   query_creation_cost?: number;
   visualization_cost?: number;
 }

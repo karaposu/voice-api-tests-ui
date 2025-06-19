@@ -43,7 +43,7 @@ export default function SettingsModal() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="w-full" size="icon" variant="ghost">
+        <Button className="md:w-full" size="icon" variant="ghost">
           <Settings className="h-5 w-5" />
         </Button>
       </DialogTrigger>
