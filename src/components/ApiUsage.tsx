@@ -21,7 +21,7 @@ export const ApiUsage = () => {
   const metaTime = queryClient.getQueryData<{ creation: string }>(["chatMeta"]);
 
   return (
-    <div className="flex flex-col text-center py-4 text-muted-foreground text-lg">
+    <div className="flex flex-col text-center text-muted-foreground text-lg">
       <span>
         $
         {apiUsageQuery?.total_cost?.toLocaleString("en-US", {
@@ -30,7 +30,7 @@ export const ApiUsage = () => {
         }) ?? 0}{" "}
         Total Cost
       </span>
-      <div className="text-xs flex gap-x-2">
+      <div className="text-xs flex justify-center gap-x-2">
         <span>
           ($
           {apiUsageQuery?.query_creation_cost?.toLocaleString("en-US", {
