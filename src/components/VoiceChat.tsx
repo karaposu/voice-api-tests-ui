@@ -1,13 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "./ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import {
   PauseIcon,
   CircleIcon,
@@ -16,9 +8,9 @@ import {
   PaperPlaneIcon,
 } from "@radix-ui/react-icons";
 import { useReactMediaRecorder } from "react-media-recorder";
-import { ModelsDataResponse } from "@/api/myApi";
-import { useModelSelectionStore } from "@/hooks/ModelSelectionStore";
 import axios from "axios";
+import { useModelSelectionStore } from "@/hooks/ModelSelectionStore";
+import { AiModelSelection } from "./AiModelSelection"; // Yolunu projenize göre ayarla
 
 export default function VoiceChat() {
   const [elapsedTime, setElapsedTime] = useState<number>(0);
@@ -36,6 +28,11 @@ export default function VoiceChat() {
       },
     });
 
+  const { default_model } = useModelSelectionStore();
+
+  const api_url = import.meta.env.VITE_API_URL;
+
+  // Kayıt başlat
   const handleStart = () => {
     startRecording();
     setElapsedTime(0);
@@ -44,11 +41,13 @@ export default function VoiceChat() {
     }, 10);
   };
 
+  // Kayıt durdur
   const handleStop = () => {
     stopRecording();
     if (intervalRef.current) clearInterval(intervalRef.current);
   };
 
+  // Ses dosyasını sil
   const handleDelete = () => {
     clearBlobUrl();
     setElapsedTime(0);
@@ -60,6 +59,7 @@ export default function VoiceChat() {
     setAudioBlob(null);
   };
 
+  // Ses oynat/durdur toggle
   const togglePlayback = () => {
     if (!audioRef.current) return;
     if (isPlaying) {
@@ -71,65 +71,70 @@ export default function VoiceChat() {
     }
   };
 
+  // Oynatma bitince durumu resetle
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     const handleEnded = () => setIsPlaying(false);
     audio.addEventListener("ended", handleEnded);
     return () => audio.removeEventListener("ended", handleEnded);
   }, []);
 
+  // Component unmount olunca interval temizle
   useEffect(() => {
     return () => {
-      // unmount sırasında interval'ı temizle
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, []);
 
-  const handleSend = () => {
-    if (!audioBlob || !defaultModels.default_model_for_query_generation) return;
+  // Kaydedilen sesi backend'e gönder
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (typeof result === "string") {
+          resolve(result.split(",")[1]); // base64 içeriği al (data:... kısmı hariç)
+        } else {
+          reject("Invalid base64 result");
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+  const handleSend = async () => {
+    if (!audioBlob || !default_model) return;
 
     const formData = new FormData();
     formData.append("file", audioBlob, "recording.wav");
-    formData.append("model", defaultModels.default_model_for_query_generation);
 
-    console.log("[SEND]", formData);
+    // Ses dosyasını base64'e çevir
+    const base64 = await blobToBase64(audioBlob);
+    formData.append("message", base64);
+    formData.append("message_format", "voice");
+    formData.append("model", default_model.toString());
+
+    try {
+      const token = localStorage.getItem("access_token");
+      await axios.post(api_url + "/voice-to-text", formData, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+        },
+      });
+
+      handleDelete(); // Gönderim sonrası temizle
+    } catch (error) {
+      console.error("Voice send failed:", error);
+    }
   };
 
+  // Zamanı güzel formatla (sn.ms)
   const formatTime = (ms: number) => {
     const seconds = Math.floor(ms / 1000);
     const milliseconds = ms % 1000;
     return `${seconds}.${milliseconds.toString().padStart(3, "0")} sec`;
   };
-
-  const api_url = import.meta.env.VITE_API_URL;
-
-  const { setDefaultModel, defaultModels, initializeDefaults } =
-    useModelSelectionStore();
-
-  const getModelsFunction = async (): Promise<ModelsDataResponse> => {
-    const response = await axios.get(api_url + "/info/models");
-    return response.data;
-  };
-
-  const modelQuery = useQuery({
-    queryKey: ["models"],
-    queryFn: getModelsFunction,
-    refetchOnWindowFocus: false,
-    staleTime: Infinity,
-  });
-
-  useEffect(() => {
-    if (modelQuery.data?.defaults) {
-      const areDefaultsSet = Object.values(defaultModels).every(
-        (value) => value !== ""
-      );
-      if (!areDefaultsSet) {
-        initializeDefaults(modelQuery.data.defaults);
-      }
-    }
-  }, [modelQuery.data?.defaults, defaultModels, initializeDefaults]);
 
   return (
     <div className="flex flex-col items-center md:p-4 p-2 border rounded-xl shadow-md w-full space-y-4">
@@ -158,36 +163,12 @@ export default function VoiceChat() {
         </Button>
       </div>
 
-      <div className="flex items-center md:gap-4 gap-2">
-        <Select
-          defaultValue={
-            modelQuery.data?.defaults?.default_model_for_query_generation
-          }
-          value={defaultModels.default_model_for_query_generation}
-          onValueChange={(value) => {
-            setDefaultModel("default_model_for_query_generation", value);
-          }}
-        >
-          <SelectTrigger className="md:w-[100px] w-full text-[10px]">
-            <SelectValue placeholder="Model" />
-          </SelectTrigger>
-          <SelectContent>
-            {modelQuery.data?.models?.map((model) => (
-              <SelectItem
-                key={model}
-                value={model}
-                className="px-4 py-2 cursor-pointer hover:bg-gray-100"
-              >
-                {model}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* AiModelSelection componentini buraya koyuyoruz */}
+      <AiModelSelection />
 
-        <Button onClick={handleSend} disabled={!audioBlob}>
-          <PaperPlaneIcon className="mr-2" /> Send
-        </Button>
-      </div>
+      <Button onClick={handleSend} disabled={!audioBlob}>
+        <PaperPlaneIcon className="mr-2" /> Send
+      </Button>
 
       {mediaBlobUrl && (
         <audio key={mediaBlobUrl} src={mediaBlobUrl} ref={audioRef} hidden />
