@@ -6,6 +6,7 @@ import ChatPage from "./components/ChatPage";
 import Register from "./pages/Register";
 import Login from "./pages/Login";
 import Topside from "./components/Topside";
+import PowerManifest from "./pages/PowerManifest";
 
 function App() {
   const queryClient = new QueryClient();
@@ -19,6 +20,7 @@ function App() {
             <Route path="/" element={<ChatPage />} />
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/power-manifest" element={<PowerManifest />} />
           </Routes>
         </BrowserRouter>
         <Toaster richColors={true} />
